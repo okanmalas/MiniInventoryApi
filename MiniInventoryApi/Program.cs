@@ -1,12 +1,15 @@
 using MiniInventoryApi.Models;
 using MiniInventoryApi.Services;
 
+#region Variables
+
 var builder = WebApplication.CreateBuilder(args);
-
 builder.Services.AddSingleton<StokService>();
-//TODO: maybe add services or delete todo
-
 var app = builder.Build();
+
+#endregion
+
+#region Middleware
 
 app.Use(async (context, next) =>
 {
@@ -52,6 +55,10 @@ app.Use(async (context, next) =>
     Console.WriteLine("Api work is finished, returned");
 }); // /admin request denied. Third middleware
 
+#endregion
+
+#region Endpoints
+
 app.MapGet("/durum", () =>
 {
     if (app.Environment.IsDevelopment())
@@ -59,14 +66,14 @@ app.MapGet("/durum", () =>
         return Results.Ok("Development environment");
     }
     return Results.Ok("Production environment");
-});
+}); // /durum request -> development or production
 
 app.MapGet("/urunler", (StokService Stoks) =>
 {
     Console.WriteLine("Get /urunler request");
     Console.WriteLine($"{Stoks.Stoks.Count} sayıda ürün döndürüldü");
     return Results.Ok(Stoks.Stoks);
-});
+}); // /urunler request -> return all products
 
 app.MapPost("/urunler", (StokService Stoks, Stok yeniUrun, IConfiguration Configuration) =>
 {
@@ -82,7 +89,7 @@ app.MapPost("/urunler", (StokService Stoks, Stok yeniUrun, IConfiguration Config
     Stoks.Stoks.Add(yeniUrun);
     Console.WriteLine($"New product added: Id: {yeniUrun.Id}, Name:{yeniUrun.Name}, Price:{yeniUrun.Price}, Description:{yeniUrun.Description}");
     return Results.Created($"/urunler/{yeniUrun.Id}", yeniUrun);
-});
+}); // /urunler request -> add new product
 
 app.MapDelete("/urunler", (StokService Stoks) =>
 {
@@ -90,6 +97,8 @@ app.MapDelete("/urunler", (StokService Stoks) =>
     Stoks.Stoks.Clear();
     Console.WriteLine("All products deleted");
     return Results.NoContent();
-});
+}); // /urunler request -> delete all products
+
+#endregion
 
 app.Run();
