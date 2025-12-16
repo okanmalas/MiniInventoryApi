@@ -82,7 +82,7 @@ app.MapGet("/urunler", async (AppDbContext context) =>
 app.MapPost("/urunler", async (AppDbContext context, Stok yeniUrun, IConfiguration config) =>
 {
     int mevcutSayi = await context.Stoklar.CountAsync();
-    int limit = config.GetValue<int>("MaksimumUrunSayisi");
+    int limit = config.GetValue<int>("Rules:MaxAmount");
 
     if (mevcutSayi >= limit)
     {
