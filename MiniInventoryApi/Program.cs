@@ -1,10 +1,15 @@
 using MiniInventoryApi.Models;
-using MiniInventoryApi.Services;
+using MiniInventoryApi.Data;
+using Microsoft.EntityFrameworkCore;
 
 #region Variables
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddSingleton<StokService>();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
 var app = builder.Build();
 
 #endregion
@@ -68,34 +73,31 @@ app.MapGet("/durum", () =>
     return Results.Ok("Production environment");
 }); // /durum request -> development or production
 
-app.MapGet("/urunler", (StokService Stoks) =>
+app.MapGet("/urunler", async (AppDbContext context) =>
 {
-    Console.WriteLine("Get /urunler request");
-    Console.WriteLine($"{Stoks.Stoks.Count} sayıda ürün döndürüldü");
-    return Results.Ok(Stoks.Stoks);
+    var urunler = await context.Stoklar.ToListAsync();
+    return Results.Ok(urunler);
 }); // /urunler request -> return all products
 
-app.MapPost("/urunler", (StokService Stoks, Stok yeniUrun, IConfiguration Configuration) =>
+app.MapPost("/urunler", async (AppDbContext context, Stok yeniUrun, IConfiguration config) =>
 {
-    Console.WriteLine("Post /urunler request");
-    int limit = app.Configuration.GetValue<int>("Rules:MaxAmount");
-    if (Stoks.Stoks.Count >= limit)
+    int mevcutSayi = await context.Stoklar.CountAsync();
+    int limit = config.GetValue<int>("MaksimumUrunSayisi");
+
+    if (mevcutSayi >= limit)
     {
-        Console.WriteLine("Max amount reached");
-        return Results.BadRequest("Max amount reached");
+        return Results.BadRequest("Veritabanı limiti doldu!");
     }
 
-    yeniUrun.Id = Stoks.Stoks.Count + 1;
-    Stoks.Stoks.Add(yeniUrun);
-    Console.WriteLine($"New product added: Id: {yeniUrun.Id}, Name:{yeniUrun.Name}, Price:{yeniUrun.Price}, Description:{yeniUrun.Description}");
+    await context.Stoklar.AddAsync(yeniUrun);
+    await context.SaveChangesAsync();
+
     return Results.Created($"/urunler/{yeniUrun.Id}", yeniUrun);
 }); // /urunler request -> add new product
 
-app.MapDelete("/urunler", (StokService Stoks) =>
+app.MapDelete("/urunler", async (AppDbContext context) =>
 {
-    Console.WriteLine("Delete /urunler request");
-    Stoks.Stoks.Clear();
-    Console.WriteLine("All products deleted");
+    await context.Stoklar.ExecuteDeleteAsync();
     return Results.NoContent();
 }); // /urunler request -> delete all products
 
