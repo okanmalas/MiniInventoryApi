@@ -19,12 +19,12 @@ var app = builder.Build();
 app.Use(async (context, next) =>
 {
     var watch = System.Diagnostics.Stopwatch.StartNew();
-    Console.WriteLine("Request started"); //TODO log yaz (dosya)
+    Console.WriteLine("Request started");
     
     await next();
     
     watch.Stop();
-    Console.WriteLine($"Request completed in {watch.ElapsedMilliseconds}ms"); //TODO log yaz (dosya)
+    Console.WriteLine($"Request completed in {watch.ElapsedMilliseconds}ms");
 }); //log startTime, endTime. First middleware
 
 app.Use(async (context, next) =>
@@ -64,6 +64,19 @@ app.Use(async (context, next) =>
 
 #region Endpoints
 
+app.MapGet("/kategori", async (AppDbContext context) =>
+{
+    var kategoriler = await context.Kategoriler.ToListAsync();
+    return Results.Ok(kategoriler);
+}); // /kategori request -> add new category
+
+app.MapPost("/kategori", async (AppDbContext context, Kategori Kategori) =>
+{
+    await context.Kategoriler.AddAsync(Kategori);
+    await context.SaveChangesAsync();
+    return Results.Created($"/kategori/{Kategori.Id}", Kategori);
+});
+
 app.MapGet("/durum", () =>
 {
     if (app.Environment.IsDevelopment())
@@ -75,7 +88,9 @@ app.MapGet("/durum", () =>
 
 app.MapGet("/urunler", async (AppDbContext context) =>
 {
-    var urunler = await context.Stoklar.ToListAsync();
+    var urunler = await context.Stoklar
+                                        .Include(x => x.Kategori) 
+                                        .ToListAsync();
     return Results.Ok(urunler);
 }); // /urunler request -> return all products
 
@@ -85,8 +100,12 @@ app.MapPost("/urunler", async (AppDbContext context, Stok yeniUrun, IConfigurati
     int limit = config.GetValue<int>("Rules:MaxAmount");
 
     if (mevcutSayi >= limit)
+        return Results.BadRequest("Limit doldu!");
+
+    var kategoriVarMi = await context.Kategoriler.AnyAsync(k => k.Id == yeniUrun.KategoriId);
+    if (!kategoriVarMi)
     {
-        return Results.BadRequest("Veritabanı limiti doldu!");
+        return Results.BadRequest($"HATA: {yeniUrun.KategoriId} ID'li bir kategori bulunamadı! Önce kategori ekleyin.");
     }
 
     await context.Stoklar.AddAsync(yeniUrun);
